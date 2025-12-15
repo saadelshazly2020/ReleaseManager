@@ -1,0 +1,20 @@
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+import * as path from 'path'
+
+// https://vite.dev/config/
+export default defineConfig({
+    plugins: [react()],
+    server: {
+        hmr: {
+            overlay: false  // Disable the error overlay
+        }
+    },
+    loader: { '.js': 'jsx' },
+    resolve: {
+        alias: {
+            '@': '/src',  // Try this simpler version
+            '@/': '/src/', // Or try this
+        }
+    }
+})
