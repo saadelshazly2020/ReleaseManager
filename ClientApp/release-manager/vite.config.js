@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import * as path from 'path'
+import { fileURLToPath } from 'url'
+//import tailwindcss from '@tailwindcss/postcss'; // Import the new package
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -10,11 +11,40 @@ export default defineConfig({
             overlay: false  // Disable the error overlay
         }
     },
-    loader: { '.js': 'jsx' },
+    esbuild: {
+        loader: 'jsx',
+        include: /src\/.*\.jsx?$/,
+        exclude: [],
+    },
+    optimizeDeps: {
+        esbuildOptions: {
+            loader: {
+                '.js': 'jsx',
+            },
+        },
+    },
     resolve: {
-        alias: {
-            '@': '/src',  // Try this simpler version
-            '@/': '/src/', // Or try this
-        }
-    }
+       alias: [
+            {
+                find: '@/lib',
+                replacement: fileURLToPath(new URL('./src/lib', import.meta.url))
+            },
+            {
+                find: '@/components',
+                replacement: fileURLToPath(new URL('./src/components', import.meta.url))
+            },
+            {
+                find: '@',
+                replacement: fileURLToPath(new URL('./src', import.meta.url))
+            }
+        ]
+    },
+    //css: {
+    //    postcss: {
+    //        plugins: [
+    //            tailwindcss, // Use the new package
+    //            //autoprefixer,
+    //        ],
+    //    },
+    //},
 })
