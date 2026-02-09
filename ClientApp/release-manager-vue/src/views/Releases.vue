@@ -1,5 +1,5 @@
-<script setup lang="ts">
-import { ref, computed } from 'vue';
+<script lang="ts">
+import { defineComponent, ref, computed } from 'vue';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query';
 import { useRouter } from 'vue-router';
 import { base44, type Release, type Project, type Team } from '@/api/base44Client';
@@ -14,79 +14,153 @@ import Badge from '@/components/ui/Badge.vue';
 import { Search, Plus, Package, Edit, Trash2, Loader2, Calendar } from 'lucide-vue-next';
 import { format } from 'date-fns';
 
-const { t, isRTL } = useLanguage();
-const router = useRouter();
-const queryClient = useQueryClient();
-
-const STATUS_CONFIG = {
-  planning: { label: computed(() => t('planning')), color: 'bg-slate-100 text-slate-700' },
-  in_progress: { label: computed(() => t('inProgress')), color: 'bg-blue-100 text-blue-700' },
-  testing: { label: computed(() => t('testing')), color: 'bg-purple-100 text-purple-700' },
-  ready_for_deploy: { label: computed(() => t('readyForDeploy')), color: 'bg-amber-100 text-amber-700' },
-  deployed: { label: computed(() => t('deployed')), color: 'bg-emerald-100 text-emerald-700' },
-  cancelled: { label: computed(() => t('cancelled')), color: 'bg-rose-100 text-rose-700' },
-};
-
-const PRIORITY_CONFIG = {
-  low: { label: computed(() => t('low')), color: 'bg-slate-100 text-slate-700' },
-  medium: { label: computed(() => t('medium')), color: 'bg-blue-100 text-blue-700' },
-  high: { label: computed(() => t('high')), color: 'bg-amber-100 text-amber-700' },
-  critical: { label: computed(() => t('critical')), color: 'bg-rose-100 text-rose-700' },
-};
-
-const searchQuery = ref('');
-const statusFilter = ref<string>('all');
-
-const { data: releases, isLoading } = useQuery({
-  queryKey: ['releases'],
-  queryFn: () => base44.entities.Release.list(),
-});
-
-const { data: projects } = useQuery({
-  queryKey: ['projects'],
-  queryFn: () => base44.entities.Project.list(),
-});
-
-const { data: teams } = useQuery({
-  queryKey: ['teams'],
-  queryFn: () => base44.entities.Team.list(),
-});
-
-const deleteMutation = useMutation({
-  mutationFn: (id: string) => base44.entities.Release.delete(id),
-  onSuccess: () => {
-    queryClient.invalidateQueries({ queryKey: ['releases'] });
+export default defineComponent({
+  name: 'ReleasesView',
+  components: {
+    Button,
+    Input,
+    Card,
+    CardHeader,
+    CardTitle,
+    CardContent,
+    Badge,
+    Search,
+    Plus,
+    Package,
+    Edit,
+    Trash2,
+    Loader2,
+    Calendar,
   },
-});
 
-const getProjectName = (projectId?: string) => {
-  if (!projectId || !projects.value || !Array.isArray(projects.value) || projects.value.length === 0) return t('unassigned');
-  const project = projects.value.find((p: Project) => p.id === projectId);
-  return project?.name || t('unassigned');
-};
+  setup() {
+    const { t, isRTL } = useLanguage();
+    const router = useRouter();
+    const queryClient = useQueryClient();
 
-const getTeamName = (teamId?: string) => {
-  if (!teamId || !teams.value || !Array.isArray(teams.value) || teams.value.length === 0) return t('unassigned');
-  const team = teams.value.find((t: Team) => t.id === teamId);
-  return team?.name || t('unassigned');
-};
+    const searchQuery = ref('');
+    const statusFilter = ref<string>('all');
 
-const formatDate = (dateString?: string) => {
-  if (!dateString) return t('notSet');
-  return format(new Date(dateString), 'MMM dd, yyyy');
-};
+    const STATUS_CONFIG = computed(() => ({
+      planning: { label: t('planning'), color: 'bg-slate-100 text-slate-700' },
+      in_progress: { label: t('inProgress'), color: 'bg-blue-100 text-blue-700' },
+      testing: { label: t('testing'), color: 'bg-purple-100 text-purple-700' },
+      ready_for_deploy: { label: t('readyForDeploy'), color: 'bg-amber-100 text-amber-700' },
+      deployed: { label: t('deployed'), color: 'bg-emerald-100 text-emerald-700' },
+      cancelled: { label: t('cancelled'), color: 'bg-rose-100 text-rose-700' },
+    }));
 
-const filteredReleases = computed(() => {
-  if (!releases.value || !Array.isArray(releases.value) || releases.value.length === 0) return [];
-  
-  return releases.value.filter((release: Release) => {
-    const matchesSearch =
-      !searchQuery.value ||
-      release.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      release.version.toLowerCase().includes(searchQuery.value.toLowerCase());
-    const matchesStatus = statusFilter.value === 'all' || release.status === statusFilter.value;
-    return matchesSearch && matchesStatus;
-  });
+    const PRIORITY_CONFIG = computed(() => ({
+      low: { label: t('low'), color: 'bg-slate-100 text-slate-700' },
+      medium: { label: t('medium'), color: 'bg-blue-100 text-blue-700' },
+      high: { label: t('high'), color: 'bg-amber-100 text-amber-700' },
+      critical: { label: t('critical'), color: 'bg-rose-100 text-rose-700' },
+    }));
+
+    const { data: releases, isLoading } = useQuery({
+      queryKey: ['releases'],
+      queryFn: async () => {
+        const result = await base44.entities.Release.list();
+        return Array.isArray(result) ? result : (result?.data || result?.value || []);
+      },
+      enabled: true,
+      staleTime: 0,
+      gcTime: 0,
+    });
+
+    const { data: projects } = useQuery({
+      queryKey: ['projects'],
+      queryFn: async () => {
+        const result = await base44.entities.Project.list();
+        return Array.isArray(result) ? result : (result?.data || result?.value || []);
+      },
+      enabled: true,
+      staleTime: 0,
+      gcTime: 0,
+    });
+
+    const { data: teams } = useQuery({
+      queryKey: ['teams'],
+      queryFn: async () => {
+        const result = await base44.entities.Team.list();
+        return Array.isArray(result) ? result : (result?.data || result?.value || []);
+      },
+      enabled: true,
+      staleTime: 0,
+      gcTime: 0,
+    });
+
+    const deleteMutation = useMutation({
+      mutationFn: (id: string) => base44.entities.Release.delete(id),
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ['releases'] });
+      },
+    });
+
+    const getProjectName = (projectId?: string): string => {
+      if (!projectId || !projects.value || !Array.isArray(projects.value) || projects.value.length === 0) {
+        return t('unassigned');
+      }
+      const project = projects.value.find((p: Project) => p.id === projectId);
+      return project?.name || t('unassigned');
+    };
+
+    const getTeamName = (teamId?: string): string => {
+      if (!teamId || !teams.value || !Array.isArray(teams.value) || teams.value.length === 0) {
+        return t('unassigned');
+      }
+      const team = teams.value.find((t: Team) => t.id === teamId);
+      return team?.name || t('unassigned');
+    };
+
+    const formatDate = (dateString?: string): string => {
+      if (!dateString) return t('notSet');
+      return format(new Date(dateString), 'MMM dd, yyyy');
+    };
+
+    const filteredReleases = computed((): Release[] => {
+      if (!releases.value || !Array.isArray(releases.value) || releases.value.length === 0) {
+        return [];
+      }
+      
+      return releases.value.filter((release: Release) => {
+        const matchesSearch =
+          !searchQuery.value ||
+          release.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+          release.version.toLowerCase().includes(searchQuery.value.toLowerCase());
+        const matchesStatus = statusFilter.value === 'all' || release.status === statusFilter.value;
+        return matchesSearch && matchesStatus;
+      });
+    });
+
+    return {
+      // State
+      searchQuery,
+      statusFilter,
+      // Data
+      releases,
+      projects,
+      teams,
+      isLoading,
+      // Mutations
+      deleteMutation,
+      // Computed
+      filteredReleases,
+      STATUS_CONFIG,
+      PRIORITY_CONFIG,
+      // Methods
+      getProjectName,
+      getTeamName,
+      formatDate,
+      // Utilities
+      t,
+      isRTL,
+    };
+  },
+
+  mounted() {
+    console.log('🎯 Releases page mounted - ready to display data');
+  },
 });
 </script>
 
@@ -126,7 +200,7 @@ const filteredReleases = computed(() => {
         >
           <option value="all">{{ t('allStatus') }}</option>
           <option v-for="(config, key) in STATUS_CONFIG" :key="key" :value="key">
-            {{ config.label.value }}
+            {{ config.label }}
           </option>
         </select>
       </div>
@@ -148,7 +222,7 @@ const filteredReleases = computed(() => {
         <div
           v-for="release in filteredReleases"
           :key="release.id"
-          class="opacity-0 animate-[fadeIn_0.3s_ease-in_forwards]"
+          class="fade-in-card"
         >
           <Card class="hover:shadow-lg transition-shadow">
             <CardHeader class="pb-3">
@@ -192,10 +266,10 @@ const filteredReleases = computed(() => {
               </div>
               <div class="flex items-center justify-between">
                 <Badge :class="STATUS_CONFIG[release.status]?.color">
-                  {{ STATUS_CONFIG[release.status]?.label.value }}
+                  {{ STATUS_CONFIG[release.status]?.label }}
                 </Badge>
                 <Badge :class="PRIORITY_CONFIG[release.priority]?.color">
-                  {{ PRIORITY_CONFIG[release.priority]?.label.value }}
+                  {{ PRIORITY_CONFIG[release.priority]?.label }}
                 </Badge>
               </div>
             </CardContent>
@@ -216,5 +290,9 @@ const filteredReleases = computed(() => {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+.fade-in-card {
+  animation: fadeIn 0.3s ease-in forwards;
 }
 </style>

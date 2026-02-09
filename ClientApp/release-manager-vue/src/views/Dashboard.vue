@@ -1,5 +1,5 @@
-<script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+<script lang="ts">
+import { defineComponent, computed } from 'vue';
 import { useQuery } from '@tanstack/vue-query';
 import { base44, type Release, type Team } from '@/api/base44Client';
 import { useLanguage } from '@/composables/useLanguage';
@@ -12,136 +12,192 @@ import Badge from '@/components/ui/Badge.vue';
 import { RefreshCw, Plus, TrendingUp, TrendingDown, Calendar, AlertCircle } from 'lucide-vue-next';
 import { format } from 'date-fns';
 
-const { t, isRTL } = useLanguage();
+export default defineComponent({
+  name: 'DashboardView',
+  components: {
+    Button,
+    Card,
+    CardHeader,
+    CardTitle,
+    CardContent,
+    Badge,
+    RefreshCw,
+    Plus,
+    TrendingUp,
+    TrendingDown,
+    Calendar,
+    AlertCircle,
+  },
 
-const { data: releases, isLoading, refetch } = useQuery({
-  queryKey: ['releases'],
-  queryFn: () => base44.entities.Release.list(),
-});
+  setup() {
+    const { t, isRTL } = useLanguage();
 
-const { data: teams } = useQuery({
-  queryKey: ['teams'],
-  queryFn: () => base44.entities.Team.list(),
-});
-
-const statusConfig = {
-  planning: { label: computed(() => t('planning')), color: 'bg-slate-100 text-slate-700', count: 0 },
-  in_progress: { label: computed(() => t('inProgress')), color: 'bg-blue-100 text-blue-700', count: 0 },
-  testing: { label: computed(() => t('testing')), color: 'bg-purple-100 text-purple-700', count: 0 },
-  ready_for_deploy: { label: computed(() => t('readyForDeploy')), color: 'bg-amber-100 text-amber-700', count: 0 },
-  deployed: { label: computed(() => t('deployed')), color: 'bg-emerald-100 text-emerald-700', count: 0 },
-  cancelled: { label: computed(() => t('cancelled')), color: 'bg-rose-100 text-rose-700', count: 0 },
-};
-
-const stats = computed(() => {
-  if (!releases.value || !Array.isArray(releases.value) || releases.value.length === 0) {
-    return {
-      activeReleases: 0,
-      completedReleases: 0,
-      upcomingReleases: 0,
-      overdueReleases: 0,
-    };
-  }
-
-  const activeReleases = releases.value.filter((r: Release) => 
-    r.status === 'in_progress' || r.status === 'testing' || r.status === 'ready_for_deploy'
-  ).length;
-
-  const completedReleases = releases.value.filter((r: Release) => r.status === 'deployed').length;
-  
-  const upcomingReleases = releases.value.filter((r: Release) => 
-    r.scheduledDate && new Date(r.scheduledDate) > new Date()
-  ).length;
-
-  const overdueReleases = releases.value.filter((r: Release) => 
-    r.scheduledDate && 
-    new Date(r.scheduledDate) < new Date() && 
-    r.status !== 'deployed' &&
-    r.status !== 'cancelled'
-  ).length;
-
-  return {
-    activeReleases,
-    completedReleases,
-    upcomingReleases,
-    overdueReleases,
-  };
-});
-
-const statusDistribution = computed(() => {
-  const distribution: Record<string, number> = {
-    planning: 0,
-    in_progress: 0,
-    testing: 0,
-    ready_for_deploy: 0,
-    deployed: 0,
-    cancelled: 0,
-  };
-
-  if (!releases.value || !Array.isArray(releases.value) || releases.value.length === 0) {
-    return distribution;
-  }
-
-  releases.value.forEach((release: Release) => {
-    if (distribution.hasOwnProperty(release.status)) {
-      distribution[release.status]++;
-    }
-  });
-
-  return distribution;
-});
-
-const upcomingReleases = computed(() => {
-  if (!releases.value || !Array.isArray(releases.value) || releases.value.length === 0) {
-    return [];
-  }
-
-  return releases.value
-    .filter((r: Release) => r.scheduledDate && new Date(r.scheduledDate) > new Date())
-    .sort((a: Release, b: Release) => 
-      new Date(a.scheduledDate!).getTime() - new Date(b.scheduledDate!).getTime()
-    )
-    .slice(0, 5);
-});
-
-const teamWorkload = computed(() => {
-  const workload: Record<string, { name: string; activeReleases: number; color?: string }> = {};
-
-  if (!teams.value || !Array.isArray(teams.value) || teams.value.length === 0) {
-    return [];
-  }
-
-  teams.value.forEach((team: Team) => {
-    workload[team.id] = {
-      name: team.name,
-      activeReleases: 0,
-      color: team.color,
-    };
-  });
-
-  if (releases.value && Array.isArray(releases.value) && releases.value.length > 0) {
-    releases.value.forEach((release: Release) => {
-      if (release.teamId && workload[release.teamId] && release.status !== 'deployed' && release.status !== 'cancelled') {
-        workload[release.teamId].activeReleases++;
-      }
+    const { data: releases, isLoading, refetch } = useQuery({
+      queryKey: ['releases'],
+      queryFn: async () => {
+        const result = await base44.entities.Release.list();
+        return Array.isArray(result) ? result : (result?.data || result?.value || []);
+      },
+      enabled: true,
+      staleTime: 0,
+      gcTime: 0,
     });
-  }
 
-  return Object.values(workload).filter(w => w.activeReleases > 0);
+    const { data: teams } = useQuery({
+      queryKey: ['teams'],
+      queryFn: async () => {
+        const result = await base44.entities.Team.list();
+        return Array.isArray(result) ? result : (result?.data || result?.value || []);
+      },
+      enabled: true,
+      staleTime: 0,
+      gcTime: 0,
+    });
+
+    const statusConfig = {
+      planning: { label: t('planning'), color: 'bg-slate-100 text-slate-700', count: 0 },
+      in_progress: { label: t('inProgress'), color: 'bg-blue-100 text-blue-700', count: 0 },
+      testing: { label: t('testing'), color: 'bg-purple-100 text-purple-700', count: 0 },
+      ready_for_deploy: { label: t('readyForDeploy'), color: 'bg-amber-100 text-amber-700', count: 0 },
+      deployed: { label: t('deployed'), color: 'bg-emerald-100 text-emerald-700', count: 0 },
+      cancelled: { label: t('cancelled'), color: 'bg-rose-100 text-rose-700', count: 0 },
+    };
+
+    const stats = computed(() => {
+      if (!releases.value || !Array.isArray(releases.value) || releases.value.length === 0) {
+        return {
+          activeReleases: 0,
+          completedReleases: 0,
+          upcomingReleases: 0,
+          overdueReleases: 0,
+        };
+      }
+
+      const activeReleases = releases.value.filter((r: Release) => 
+        r.status === 'in_progress' || r.status === 'testing' || r.status === 'ready_for_deploy'
+      ).length;
+
+      const completedReleases = releases.value.filter((r: Release) => r.status === 'deployed').length;
+      
+      const upcomingReleases = releases.value.filter((r: Release) => 
+        r.scheduledDate && new Date(r.scheduledDate) > new Date()
+      ).length;
+
+      const overdueReleases = releases.value.filter((r: Release) => 
+        r.scheduledDate && 
+        new Date(r.scheduledDate) < new Date() && 
+        r.status !== 'deployed' &&
+        r.status !== 'cancelled'
+      ).length;
+
+      return {
+        activeReleases,
+        completedReleases,
+        upcomingReleases,
+        overdueReleases,
+      };
+    });
+
+    const statusDistribution = computed(() => {
+      const distribution: Record<string, number> = {
+        planning: 0,
+        in_progress: 0,
+        testing: 0,
+        ready_for_deploy: 0,
+        deployed: 0,
+        cancelled: 0,
+      };
+
+      if (!releases.value || !Array.isArray(releases.value) || releases.value.length === 0) {
+        return distribution;
+      }
+
+      releases.value.forEach((release: Release) => {
+        if (distribution.hasOwnProperty(release.status)) {
+          distribution[release.status]++;
+        }
+      });
+
+      return distribution;
+    });
+
+    const upcomingReleasesComputed = computed(() => {
+      if (!releases.value || !Array.isArray(releases.value) || releases.value.length === 0) {
+        return [];
+      }
+
+      return releases.value
+        .filter((r: Release) => r.scheduledDate && new Date(r.scheduledDate) > new Date())
+        .sort((a: Release, b: Release) => 
+          new Date(a.scheduledDate!).getTime() - new Date(b.scheduledDate!).getTime()
+        )
+        .slice(0, 5);
+    });
+
+    const teamWorkload = computed(() => {
+      const workload: Record<string, { name: string; activeReleases: number; color?: string }> = {};
+
+      if (!teams.value || !Array.isArray(teams.value) || teams.value.length === 0) {
+        return [];
+      }
+
+      teams.value.forEach((team: Team) => {
+        workload[team.id] = {
+          name: team.name,
+          activeReleases: 0,
+          color: team.color,
+        };
+      });
+
+      if (releases.value && Array.isArray(releases.value) && releases.value.length > 0) {
+        releases.value.forEach((release: Release) => {
+          if (release.teamId && workload[release.teamId] && release.status !== 'deployed' && release.status !== 'cancelled') {
+            workload[release.teamId].activeReleases++;
+          }
+        });
+      }
+
+      return Object.values(workload).filter(w => w.activeReleases > 0);
+    });
+
+    const getStatusColor = (status: string): string => {
+      return statusConfig[status as keyof typeof statusConfig]?.color || 'bg-gray-100 text-gray-700';
+    };
+
+    const getStatusLabel = (status: string): string => {
+      return statusConfig[status as keyof typeof statusConfig]?.label || status;
+    };
+
+    const formatDate = (dateString?: string): string => {
+      if (!dateString) return '-';
+      return format(new Date(dateString), 'MMM dd, yyyy');
+    };
+
+    return {
+      // Data
+      releases,
+      teams,
+      isLoading,
+      // Computed
+      stats,
+      statusDistribution,
+      upcomingReleases: upcomingReleasesComputed,
+      teamWorkload,
+      // Methods
+      getStatusColor,
+      getStatusLabel,
+      formatDate,
+      refetch,
+      // Utilities
+      t,
+      isRTL,
+    };
+  },
+
+  mounted() {
+    console.log('🎯 Dashboard page mounted - ready to display data');
+  },
 });
-
-const getStatusColor = (status: string) => {
-  return statusConfig[status as keyof typeof statusConfig]?.color || 'bg-gray-100 text-gray-700';
-};
-
-const getStatusLabel = (status: string) => {
-  return statusConfig[status as keyof typeof statusConfig]?.label.value || status;
-};
-
-const formatDate = (dateString?: string) => {
-  if (!dateString) return '-';
-  return format(new Date(dateString), 'MMM dd, yyyy');
-};
 </script>
 
 <template>
@@ -264,7 +320,7 @@ const formatDate = (dateString?: string) => {
               <div
                 v-for="release in upcomingReleases"
                 :key="release.id"
-                class="flex items-center justify-between p-3 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors"
+                class="fade-in-card flex items-center justify-between p-3 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors"
               >
                 <div>
                   <p class="font-medium text-slate-800">{{ release.name }}</p>
@@ -314,3 +370,20 @@ const formatDate = (dateString?: string) => {
     </div>
   </div>
 </template>
+
+<style scoped>
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in-card {
+  animation: fadeIn 0.3s ease-in forwards;
+}
+</style>

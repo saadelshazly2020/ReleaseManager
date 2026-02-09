@@ -1,5 +1,5 @@
-<script setup lang="ts">
-import { ref, computed } from 'vue';
+<script lang="ts">
+import { defineComponent, ref, computed } from 'vue';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query';
 import { base44, type ReleaseItem, type Release } from '@/api/base44Client';
 import { useLanguage } from '@/composables/useLanguage';
@@ -12,61 +12,124 @@ import CardContent from '@/components/ui/CardContent.vue';
 import Badge from '@/components/ui/Badge.vue';
 import { Search, Plus, ListTodo, Edit, Trash2, Loader2, User, Hash } from 'lucide-vue-next';
 
-const { t, isRTL } = useLanguage();
-const queryClient = useQueryClient();
-
-const TYPE_CONFIG = {
-  feature: { label: computed(() => t('feature')), color: 'bg-blue-100 text-blue-700', icon: '✨' },
-  bug_fix: { label: computed(() => t('bugFix')), color: 'bg-rose-100 text-rose-700', icon: '🐛' },
-  improvement: { label: computed(() => t('improvement')), color: 'bg-purple-100 text-purple-700', icon: '⚡' },
-  breaking_change: { label: computed(() => t('breakingChange')), color: 'bg-amber-100 text-amber-700', icon: '⚠️' },
-  security: { label: computed(() => t('security')), color: 'bg-emerald-100 text-emerald-700', icon: '🔒' },
-  documentation: { label: computed(() => t('documentation')), color: 'bg-slate-100 text-slate-700', icon: '📚' },
-};
-
-const STATUS_CONFIG = {
-  pending: { label: computed(() => t('pending')), color: 'bg-slate-100 text-slate-700' },
-  in_progress: { label: computed(() => t('inProgress')), color: 'bg-blue-100 text-blue-700' },
-  completed: { label: computed(() => t('completed')), color: 'bg-emerald-100 text-emerald-700' },
-};
-
-const searchQuery = ref('');
-const typeFilter = ref<string>('all');
-
-const { data: items, isLoading } = useQuery({
-  queryKey: ['releaseitems'],
-  queryFn: () => base44.entities.ReleaseItem.list(),
-});
-
-const { data: releases } = useQuery({
-  queryKey: ['releases'],
-  queryFn: () => base44.entities.Release.list(),
-});
-
-const deleteMutation = useMutation({
-  mutationFn: (id: string) => base44.entities.ReleaseItem.delete(id),
-  onSuccess: () => {
-    queryClient.invalidateQueries({ queryKey: ['releaseitems'] });
+export default defineComponent({
+  name: 'ReleaseItemsView',
+  components: {
+    Button,
+    Input,
+    Card,
+    CardHeader,
+    CardTitle,
+    CardContent,
+    Badge,
+    Search,
+    Plus,
+    ListTodo,
+    Edit,
+    Trash2,
+    Loader2,
+    User,
+    Hash,
   },
-});
 
-const getReleaseName = (releaseId?: string) => {
-  if (!releaseId || !releases.value || !Array.isArray(releases.value) || releases.value.length === 0) return t('unassigned');
-  const release = releases.value.find((r: Release) => r.id === releaseId);
-  return release ? `${release.name} (v${release.version})` : t('unassigned');
-};
+  setup() {
+    const { t, isRTL } = useLanguage();
+    const queryClient = useQueryClient();
 
-const filteredItems = computed(() => {
-  if (!items.value || !Array.isArray(items.value) || items.value.length === 0) return [];
-  
-  return items.value.filter((item: ReleaseItem) => {
-    const matchesSearch =
-      !searchQuery.value ||
-      item.title.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      (item.ticketNumber && item.ticketNumber.toLowerCase().includes(searchQuery.value.toLowerCase()));
-    const matchesType = typeFilter.value === 'all' || item.type === typeFilter.value;
-    return matchesSearch && matchesType;
-  });
+    const searchQuery = ref('');
+    const typeFilter = ref<string>('all');
+
+    const TYPE_CONFIG = computed(() => ({
+      feature: { label: t('feature'), color: 'bg-blue-100 text-blue-700', icon: '✨' },
+      bug_fix: { label: t('bugFix'), color: 'bg-rose-100 text-rose-700', icon: '🐛' },
+      improvement: { label: t('improvement'), color: 'bg-purple-100 text-purple-700', icon: '⚡' },
+      breaking_change: { label: t('breakingChange'), color: 'bg-amber-100 text-amber-700', icon: '⚠️' },
+      security: { label: t('security'), color: 'bg-emerald-100 text-emerald-700', icon: '🔒' },
+      documentation: { label: t('documentation'), color: 'bg-slate-100 text-slate-700', icon: '📚' },
+    }));
+
+    const STATUS_CONFIG = computed(() => ({
+      pending: { label: t('pending'), color: 'bg-slate-100 text-slate-700' },
+      in_progress: { label: t('inProgress'), color: 'bg-blue-100 text-blue-700' },
+      completed: { label: t('completed'), color: 'bg-emerald-100 text-emerald-700' },
+    }));
+
+    const { data: items, isLoading } = useQuery({
+      queryKey: ['releaseitems'],
+      queryFn: async () => {
+        const result = await base44.entities.ReleaseItem.list();
+        return Array.isArray(result) ? result : (result?.data || result?.value || []);
+      },
+      enabled: true,
+      staleTime: 0,
+      gcTime: 0,
+    });
+
+    const { data: releases } = useQuery({
+      queryKey: ['releases'],
+      queryFn: async () => {
+        const result = await base44.entities.Release.list();
+        return Array.isArray(result) ? result : (result?.data || result?.value || []);
+      },
+      enabled: true,
+      staleTime: 0,
+      gcTime: 0,
+    });
+
+    const deleteMutation = useMutation({
+      mutationFn: (id: string) => base44.entities.ReleaseItem.delete(id),
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ['releaseitems'] });
+      },
+    });
+
+    const getReleaseName = (releaseId?: string): string => {
+      if (!releaseId || !releases.value || !Array.isArray(releases.value) || releases.value.length === 0) {
+        return t('unassigned');
+      }
+      const release = releases.value.find((r: Release) => r.id === releaseId);
+      return release ? `${release.name} (v${release.version})` : t('unassigned');
+    };
+
+    const filteredItems = computed((): ReleaseItem[] => {
+      if (!items.value || !Array.isArray(items.value) || items.value.length === 0) {
+        return [];
+      }
+      
+      return items.value.filter((item: ReleaseItem) => {
+        const matchesSearch =
+          !searchQuery.value ||
+          item.title.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+          (item.ticketNumber && item.ticketNumber.toLowerCase().includes(searchQuery.value.toLowerCase()));
+        const matchesType = typeFilter.value === 'all' || item.type === typeFilter.value;
+        return matchesSearch && matchesType;
+      });
+    });
+
+    return {
+      // State
+      searchQuery,
+      typeFilter,
+      // Data
+      items,
+      isLoading,
+      // Mutations
+      deleteMutation,
+      // Computed
+      filteredItems,
+      TYPE_CONFIG,
+      STATUS_CONFIG,
+      // Methods
+      getReleaseName,
+      // Utilities
+      t,
+      isRTL,
+    };
+  },
+
+  mounted() {
+    console.log('🎯 Release Items page mounted - ready to display data');
+  },
 });
 </script>
 
@@ -106,7 +169,7 @@ const filteredItems = computed(() => {
         >
           <option value="all">{{ t('allTypes') }}</option>
           <option v-for="(config, key) in TYPE_CONFIG" :key="key" :value="key">
-            {{ config.icon }} {{ config.label.value }}
+            {{ config.icon }} {{ config.label }}
           </option>
         </select>
       </div>
@@ -128,7 +191,7 @@ const filteredItems = computed(() => {
         <div
           v-for="item in filteredItems"
           :key="item.id"
-          class="opacity-0 animate-[fadeIn_0.3s_ease-in_forwards]"
+          class="fade-in-card"
         >
           <Card class="hover:shadow-lg transition-shadow">
             <CardContent class="pt-6">
@@ -136,10 +199,10 @@ const filteredItems = computed(() => {
                 <div class="flex-1">
                   <div class="flex items-center gap-2 mb-2">
                     <Badge :class="TYPE_CONFIG[item.type]?.color">
-                      {{ TYPE_CONFIG[item.type]?.icon }} {{ TYPE_CONFIG[item.type]?.label.value }}
+                      {{ TYPE_CONFIG[item.type]?.icon }} {{ TYPE_CONFIG[item.type]?.label }}
                     </Badge>
                     <Badge :class="STATUS_CONFIG[item.status]?.color">
-                      {{ STATUS_CONFIG[item.status]?.label.value }}
+                      {{ STATUS_CONFIG[item.status]?.label }}
                     </Badge>
                   </div>
                   <h3 class="text-lg font-semibold text-slate-800 mb-2">{{ item.title }}</h3>
@@ -188,5 +251,9 @@ const filteredItems = computed(() => {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+.fade-in-card {
+  animation: fadeIn 0.3s ease-in forwards;
 }
 </style>

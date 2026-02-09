@@ -1,5 +1,5 @@
-<script setup lang="ts">
-import { ref, computed, unref, watch } from 'vue';
+<script lang="ts">
+import { defineComponent, ref, computed } from 'vue';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query';
 import { base44, type Project, type Team } from '@/api/base44Client';
 import { useLanguage } from '@/composables/useLanguage';
@@ -11,181 +11,262 @@ import CardTitle from '@/components/ui/CardTitle.vue';
 import CardContent from '@/components/ui/CardContent.vue';
 import Badge from '@/components/ui/Badge.vue';
 import { Search, Plus, FolderOpen, Edit, Trash2, Loader2, Users, Code } from 'lucide-vue-next';
+import Dialog from '@/components/ui/Dialog.vue';
+import DialogContent from '@/components/ui/DialogContent.vue';
+import DialogHeader from '@/components/ui/DialogHeader.vue';
+import DialogTitle from '@/components/ui/DialogTitle.vue';
+import DialogFooter from '@/components/ui/DialogFooter.vue';
 
-const { t, isRTL } = useLanguage();
-const queryClient = useQueryClient();
+interface ProjectFormData {
+  name: string;
+  description: string;
+  code: string;
+  status: string;
+  teamId: string;
+}
 
-const STATUS_CONFIG = {
-  active: { label: computed(() => t('active')), color: 'bg-emerald-100 text-emerald-700' },
-  on_hold: { label: computed(() => t('onHold')), color: 'bg-amber-100 text-amber-700' },
-  completed: { label: computed(() => t('completed')), color: 'bg-blue-100 text-blue-700' },
-  archived: { label: computed(() => t('archived')), color: 'bg-slate-100 text-slate-700' },
-};
-
-const searchQuery = ref('');
-const statusFilter = ref<string>('all');
-const showDialog = ref(false);
-const editingProject = ref<Project | null>(null);
-const formData = ref({
-  name: '',
-  description: '',
-  code: '',
-  status: 'active',
-  teamId: '',
-});
-
-const { data: projects, isLoading, error: projectsError, isSuccess, isFetching } = useQuery({
-  queryKey: ['projects'],
-  queryFn: async () => {
-    console.log('📦 Fetching projects...');
-    try {
-      const result = await base44.entities.Project.list('-createdDate');
-      console.log('📦 Projects raw result:', result);
-      console.log('📦 Result type:', typeof result);
-      console.log('📦 Is array?', Array.isArray(result));
-      console.log('📦 Result keys:', Object.keys(result || {}));
-      
-      // Handle if result is wrapped
-      const data = Array.isArray(result) ? result : (result?.data || result?.value || []);
-      console.log('📦 Final data:', data);
-      console.log('📦 Final data type:', typeof data);
-      console.log('📦 Final is array?', Array.isArray(data));
-      console.log('📦 Final length:', data?.length);
-      
-      return data;
-    } catch (err) {
-      console.error('📦 Error fetching projects:', err);
-      throw err;
-    }
+export default defineComponent({
+  name: 'ProjectsView',
+  components: {
+    Button,
+    Input,
+    Card,
+    CardHeader,
+    CardTitle,
+    CardContent,
+    Badge,
+    Search,
+    Plus,
+    FolderOpen,
+    Edit,
+    Trash2,
+    Loader2,
+    Users,
+    Code,
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogFooter,
   },
-});
 
-const { data: teams } = useQuery({
-  queryKey: ['teams'],
-  queryFn: async () => {
-    console.log('👥 Fetching teams...');
-    const result = await base44.entities.Team.list();
-    return Array.isArray(result) ? result : (result?.data || result?.value || []);
-  },
-});
+  setup() {
+    const { t, isRTL } = useLanguage();
+    const queryClient = useQueryClient();
 
-const { data: releases } = useQuery({
-  queryKey: ['releases'],
-  queryFn: async () => {
-    console.log('🚀 Fetching releases...');
-    const result = await base44.entities.Release.list();
-    return Array.isArray(result) ? result : (result?.data || result?.value || []);
-  },
-});
+    // Reactive state
+    const searchQuery = ref('');
+    const statusFilter = ref<string>('all');
+    const showDialog = ref(false);
+    const editingProject = ref<Project | null>(null);
+    const formData = ref<ProjectFormData>({
+      name: '',
+      description: '',
+      code: '',
+      status: 'active',
+      teamId: '',
+    });
 
-const createMutation = useMutation({
-  mutationFn: (data: Partial<Project>) => base44.entities.Project.create(data),
-  onSuccess: () => {
-    queryClient.invalidateQueries({ queryKey: ['projects'] });
-    handleCloseDialog();
-  },
-});
+    // Queries
+    const { data: projects, isLoading, error: projectsError } = useQuery({
+      queryKey: ['projects'],
+      queryFn: async () => {
+        try {
+          const result = await base44.entities.Project.list('-createdDate');
+          return Array.isArray(result) ? result : (result?.data || result?.value || []);
+        } catch (err) {
+          console.error('❌ Error fetching projects:', err);
+          throw err;
+        }
+      },
+      enabled: true,
+      staleTime: 0,
+      gcTime: 0,
+    });
 
-const updateMutation = useMutation({
-  mutationFn: ({ id, data }: { id: string; data: Partial<Project> }) =>
-    base44.entities.Project.update(id, data),
-  onSuccess: () => {
-    queryClient.invalidateQueries({ queryKey: ['projects'] });
-    handleCloseDialog();
-  },
-});
+    const { data: teams } = useQuery({
+      queryKey: ['teams'],
+      queryFn: async () => {
+        const result = await base44.entities.Team.list();
+        return Array.isArray(result) ? result : (result?.data || result?.value || []);
+      },
+      enabled: true,
+      staleTime: 0,
+      gcTime: 0,
+    });
 
-const deleteMutation = useMutation({
-  mutationFn: (id: string) => base44.entities.Project.delete(id),
-  onSuccess: () => {
-    queryClient.invalidateQueries({ queryKey: ['projects'] });
-  },
-});
+    const { data: releases } = useQuery({
+      queryKey: ['releases'],
+      queryFn: async () => {
+        const result = await base44.entities.Release.list();
+        return Array.isArray(result) ? result : (result?.data || result?.value || []);
+      },
+      enabled: true,
+      staleTime: 0,
+      gcTime: 0,
+    });
 
-const handleOpenDialog = (project?: Project) => {
-  if (project) {
-    editingProject.value = project;
-    formData.value = {
-      name: project.name || '',
-      description: project.description || '',
-      code: project.code || '',
-      status: project.status || 'active',
-      teamId: project.teamId || '',
+    // Mutations
+    const createMutation = useMutation({
+      mutationFn: (data: Partial<Project>) => base44.entities.Project.create(data),
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ['projects'] });
+        handleCloseDialog();
+      },
+    });
+
+    const updateMutation = useMutation({
+      mutationFn: ({ id, data }: { id: string; data: Partial<Project> }) =>
+        base44.entities.Project.update(id, data),
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ['projects'] });
+        handleCloseDialog();
+      },
+    });
+
+    const deleteMutation = useMutation({
+      mutationFn: (id: string) => base44.entities.Project.delete(id),
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ['projects'] });
+      },
+    });
+
+    // Status configuration
+    const STATUS_CONFIG = computed(() => ({
+      active: { label: t('active'), color: 'bg-emerald-100 text-emerald-700' },
+      on_hold: { label: t('onHold'), color: 'bg-amber-100 text-amber-700' },
+      completed: { label: t('completed'), color: 'bg-blue-100 text-blue-700' },
+      archived: { label: t('archived'), color: 'bg-slate-100 text-slate-700' },
+    }));
+
+    // Methods
+    const handleOpenDialog = (project?: Project): void => {
+      console.log('📝 Opening dialog for project:', project);
+      if (project) {
+        editingProject.value = project;
+        formData.value = {
+          name: project.name || '',
+          description: project.description || '',
+          code: project.code || '',
+          status: project.status || 'active',
+          teamId: project.teamId || '',
+        };
+        console.log('📝 Form data loaded:', formData.value);
+      } else {
+        editingProject.value = null;
+        formData.value = {
+          name: '',
+          description: '',
+          code: '',
+          status: 'active',
+          teamId: '',
+        };
+        console.log('📝 Empty form initialized');
+      }
+      showDialog.value = true;
+      console.log('📝 Dialog opened, showDialog:', showDialog.value);
     };
-  } else {
-    editingProject.value = null;
-    formData.value = { name: '', description: '', code: '', status: 'active', teamId: '' };
-  }
-  showDialog.value = true;
-};
 
-const handleCloseDialog = () => {
-  showDialog.value = false;
-  editingProject.value = null;
-  formData.value = { name: '', description: '', code: '', status: 'active', teamId: '' };
-};
+    const handleCloseDialog = (): void => {
+      showDialog.value = false;
+      editingProject.value = null;
+      formData.value = {
+        name: '',
+        description: '',
+        code: '',
+        status: 'active',
+        teamId: '',
+      };
+    };
 
-const handleSave = () => {
-  if (editingProject.value) {
-    updateMutation.mutate({ id: editingProject.value.id, data: formData.value });
-  } else {
-    createMutation.mutate(formData.value);
-  }
-};
+    const handleSave = (): void => {
+      if (editingProject.value) {
+        updateMutation.mutate({
+          id: editingProject.value.id,
+          data: formData.value,
+        });
+      } else {
+        createMutation.mutate(formData.value);
+      }
+    };
 
-const getTeamName = (teamId?: string) => {
-  const teamsArray = unref(teams);
-  if (!teamId || !teamsArray || !Array.isArray(teamsArray) || teamsArray.length === 0) return null;
-  const team = teamsArray.find((t: Team) => t.id === teamId);
-  return team?.name;
-};
+    const getTeamName = (teamId?: string): string | null => {
+      if (!teamId || !teams.value || !Array.isArray(teams.value) || teams.value.length === 0) {
+        return null;
+      }
+      const team = teams.value.find((t: Team) => t.id === teamId);
+      return team?.name || null;
+    };
 
-const getProjectReleases = (projectId: string) => {
-  const releasesArray = unref(releases);
-  if (!releasesArray || !Array.isArray(releasesArray) || releasesArray.length === 0) return [];
-  return releasesArray.filter((r: any) => r.projectId === projectId);
-};
+    const getProjectReleases = (projectId: string): any[] => {
+      if (!releases.value || !Array.isArray(releases.value) || releases.value.length === 0) {
+        return [];
+      }
+      return releases.value.filter((r: any) => r.projectId === projectId);
+    };
 
-const filteredProjects = computed(() => {
-  const projectsArray = unref(projects);
-  
-  console.log('🔍 Computing filteredProjects:', {
-    projectsArray,
-    projectsLength: projectsArray?.length,
-    isArray: Array.isArray(projectsArray),
-    type: typeof projectsArray,
-  });
-  
-  if (!projectsArray || !Array.isArray(projectsArray) || projectsArray.length === 0) {
-    console.log('⚠️ No projects to filter');
-    return [];
-  }
-  
-  const filtered = projectsArray.filter((project: Project) => {
-    const matchesSearch =
-      !searchQuery.value ||
-      project.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      (project.code && project.code.toLowerCase().includes(searchQuery.value.toLowerCase()));
-    const matchesStatus = statusFilter.value === 'all' || project.status === statusFilter.value;
-    return matchesSearch && matchesStatus;
-  });
-  
-  console.log('✅ Filtered projects:', filtered.length);
-  return filtered;
+    // Computed properties
+    const filteredProjects = computed((): Project[] => {
+      if (!projects.value || !Array.isArray(projects.value) || projects.value.length === 0) {
+        return [];
+      }
+
+      return projects.value.filter((project: Project) => {
+        const matchesSearch =
+          !searchQuery.value ||
+          project.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+          (project.code && project.code.toLowerCase().includes(searchQuery.value.toLowerCase()));
+        const matchesStatus = statusFilter.value === 'all' || project.status === statusFilter.value;
+        return matchesSearch && matchesStatus;
+      });
+    });
+
+    return {
+      // State
+      searchQuery,
+      statusFilter,
+      showDialog,
+      editingProject,
+      formData,
+      // Data
+      projects,
+      teams,
+      releases,
+      isLoading,
+      projectsError,
+      // Mutations
+      createMutation,
+      updateMutation,
+      deleteMutation,
+      // Computed
+      filteredProjects,
+      STATUS_CONFIG,
+      // Methods
+      handleOpenDialog,
+      handleCloseDialog,
+      handleSave,
+      getTeamName,
+      getProjectReleases,
+      // Utilities
+      t,
+      isRTL,
+    };
+  },
+
+  mounted() {
+    console.log('🎯 Projects page mounted - ready to display data');
+  },
 });
-
-// Watch for projects data changes
-watch(() => projects.value, (newVal) => {
-  console.log('🔄 Projects data changed:', newVal);
-}, { immediate: true, deep: true });
 </script>
 
 <template>
+ 
   <div
     class="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50/30 p-6"
     :dir="isRTL ? 'rtl' : 'ltr'"
   >
     <div class="max-w-7xl mx-auto">
+
       <!-- Header -->
       <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
         <div>
@@ -198,14 +279,11 @@ watch(() => projects.value, (newVal) => {
         </Button>
       </div>
 
-      <!-- Debug Info (Remove in production) -->
-      <div class="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-xs space-y-1">
-        <p><strong>Debug Info:</strong></p>
-        <p>isLoading: {{ isLoading }} | isFetching: {{ isFetching }} | isSuccess: {{ isSuccess }}</p>
-        <p>Projects.value: {{ projects }}</p>
-        <p>Projects type: {{ typeof projects }} | Is Array: {{ Array.isArray(projects) }} | Length: {{ projects?.length || 'undefined' }}</p>
-        <p>Filtered count: {{ filteredProjects.length }}</p>
-        <p>Error: {{ projectsError?.message || 'None' }}</p>
+      <!-- Status Info -->
+      <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs">
+        <p>
+          <strong>Status:</strong> Loaded {{ filteredProjects.length }} / {{ projects?.length || 0 }} projects | Filter: {{ statusFilter }} | Search: "{{ searchQuery }}"
+        </p>
       </div>
 
       <!-- Filters -->
@@ -226,7 +304,7 @@ watch(() => projects.value, (newVal) => {
         >
           <option value="all">{{ t('allStatus') }}</option>
           <option v-for="(config, key) in STATUS_CONFIG" :key="key" :value="key">
-            {{ config.label.value }}
+            {{ config.label }}
           </option>
         </select>
       </div>
@@ -244,60 +322,127 @@ watch(() => projects.value, (newVal) => {
           {{ t('createProject') }}
         </Button>
       </div>
-      <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <div
-          v-for="project in filteredProjects"
-          :key="project.id"
-          class="opacity-0 animate-[fadeIn_0.3s_ease-in_forwards]"
-        >
-          <Card class="hover:shadow-lg transition-shadow">
-            <CardHeader class="pb-3">
-              <div class="flex items-start justify-between">
-                <div class="flex items-center gap-3">
-                  <div
-                    class="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center"
-                  >
-                    <FolderOpen class="w-5 h-5 text-indigo-600" />
-                  </div>
-                  <div>
-                    <CardTitle class="text-lg">{{ project.name }}</CardTitle>
-                    <p v-if="project.code" class="text-sm text-slate-500 flex items-center gap-1 mt-0.5">
-                      <Code class="w-3 h-3" />
-                      {{ project.code }}
-                    </p>
-                  </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <!--<p v-for="proj in filteredProjects">
+        {{proj.name}}
+
+      </p>-->
+      <div v-for="project in filteredProjects"
+           :key="project.id"
+           class="fade-in-card">
+       
+        <Card class="hover:shadow-lg transition-shadow">
+          <CardHeader class="pb-3">
+            <div class="flex items-start justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center">
+                  <FolderOpen class="w-5 h-5 text-indigo-600" />
                 </div>
-                <div class="flex gap-1">
-                  <Button variant="ghost" size="icon" @click="handleOpenDialog(project)">
-                    <Edit class="w-4 h-4 text-slate-400" />
-                  </Button>
-                  <Button variant="ghost" size="icon" @click="deleteMutation.mutate(project.id)">
-                    <Trash2 class="w-4 h-4 text-rose-400" />
-                  </Button>
+                <div>
+                  <CardTitle class="text-lg">{{ project.name }}</CardTitle>
+                  <p v-if="project.code" class="text-sm text-slate-500 flex items-center gap-1 mt-0.5">
+                    <Code class="w-3 h-3" />
+                    {{ project.code }}
+                  </p>
                 </div>
               </div>
-            </CardHeader>
-            <CardContent>
-              <p v-if="project.description" class="text-sm text-slate-500 mb-4 line-clamp-2">
-                {{ project.description }}
-              </p>
-              <div class="flex items-center justify-between">
-                <Badge :class="STATUS_CONFIG[project.status]?.color">
-                  {{ STATUS_CONFIG[project.status]?.label.value }}
-                </Badge>
-                <div class="flex items-center gap-3 text-sm text-slate-500">
-                  <div v-if="getTeamName(project.teamId)" class="flex items-center gap-1">
-                    <Users class="w-4 h-4" />
-                    <span>{{ getTeamName(project.teamId) }}</span>
-                  </div>
-                  <span>{{ getProjectReleases(project.id).length }} releases</span>
-                </div>
+              <div class="flex gap-1">
+                <Button variant="ghost" size="icon" @click="handleOpenDialog(project)">
+                  <Edit class="w-4 h-4 text-slate-400" />
+                </Button>
+                <Button variant="ghost" size="icon" @click="deleteMutation.mutate(project.id)">
+                  <Trash2 class="w-4 h-4 text-rose-400" />
+                </Button>
               </div>
-            </CardContent>
-          </Card>
-        </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p v-if="project.description" class="text-sm text-slate-500 mb-4 line-clamp-2">
+              {{ project.description }}
+            </p>
+            <div class="flex items-center justify-between">
+              <Badge :class="STATUS_CONFIG[project.status]?.color">
+                {{ STATUS_CONFIG[project.status]?.label }}
+              </Badge>
+              <div class="flex items-center gap-3 text-sm text-slate-500">
+                <div v-if="getTeamName(project.teamId)" class="flex items-center gap-1">
+                  <Users class="w-4 h-4" />
+                  <span>{{ getTeamName(project.teamId) }}</span>
+                </div>
+                <span>{{ getProjectReleases(project.id).length }} releases</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
       </div>
     </div>
+
+    <!-- Create/Edit Project Dialog -->
+    <Dialog :open="showDialog" @update:open="showDialog = $event">
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>
+            {{ editingProject ? t('editProject') : t('newProject') }}
+          </DialogTitle>
+        </DialogHeader>
+        <div class="space-y-4 py-4">
+          <div class="space-y-2">
+            <label class="text-sm font-medium">{{ t('projectName') }}</label>
+            <Input 
+              v-model="formData.name" 
+              :placeholder="t('projectName')"
+              type="text"
+            />
+          </div>
+          <div class="space-y-2">
+            <label class="text-sm font-medium">{{ t('description') }}</label>
+            <Input 
+              v-model="formData.description" 
+              :placeholder="t('description')"
+              type="text"
+            />
+          </div>
+          <div class="space-y-2">
+            <label class="text-sm font-medium">Code</label>
+            <Input 
+              v-model="formData.code" 
+              placeholder="e.g., PROJ"
+              type="text"
+            />
+          </div>
+          <div class="space-y-2">
+            <label class="text-sm font-medium">{{ t('status') }}</label>
+            <select 
+              v-model="formData.status" 
+              class="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+            >
+              <option v-for="(config, key) in STATUS_CONFIG" :key="key" :value="key">
+                {{ config.label }}
+              </option>
+            </select>
+          </div>
+          <div class="space-y-2">
+            <label class="text-sm font-medium">{{ t('team') }}</label>
+            <select 
+              v-model="formData.teamId" 
+              class="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+            >
+              <option value="">{{ t('unassigned') }}</option>
+              <option v-for="team in teams" :key="team.id" :value="team.id">
+                {{ team.name }}
+              </option>
+            </select>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" @click="handleCloseDialog">{{ t('cancel') }}</Button>
+          <Button @click="handleSave" class="bg-indigo-600 hover:bg-indigo-700">
+            {{ editingProject ? t('update') : t('create') }}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </div>
 </template>
 
@@ -311,5 +456,9 @@ watch(() => projects.value, (newVal) => {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+.fade-in-card {
+  animation: fadeIn 0.3s ease-in forwards;
 }
 </style>

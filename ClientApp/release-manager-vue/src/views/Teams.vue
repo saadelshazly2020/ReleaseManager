@@ -1,5 +1,5 @@
-<script setup lang="ts">
-import { ref, computed } from 'vue';
+<script lang="ts">
+import { defineComponent, ref, computed } from 'vue';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query';
 import { base44, type Team } from '@/api/base44Client';
 import { useLanguage } from '@/composables/useLanguage';
@@ -11,33 +11,81 @@ import CardTitle from '@/components/ui/CardTitle.vue';
 import CardContent from '@/components/ui/CardContent.vue';
 import { Search, Plus, Users, Edit, Trash2, Loader2, User } from 'lucide-vue-next';
 
-const { t, isRTL } = useLanguage();
-const queryClient = useQueryClient();
-
-const searchQuery = ref('');
-
-const { data: teams, isLoading } = useQuery({
-  queryKey: ['teams'],
-  queryFn: () => base44.entities.Team.list(),
-});
-
-const deleteMutation = useMutation({
-  mutationFn: (id: string) => base44.entities.Team.delete(id),
-  onSuccess: () => {
-    queryClient.invalidateQueries({ queryKey: ['teams'] });
+export default defineComponent({
+  name: 'TeamsView',
+  components: {
+    Button,
+    Input,
+    Card,
+    CardHeader,
+    CardTitle,
+    CardContent,
+    Search,
+    Plus,
+    Users,
+    Edit,
+    Trash2,
+    Loader2,
+    User,
   },
-});
 
-const filteredTeams = computed(() => {
-  if (!teams.value || !Array.isArray(teams.value) || teams.value.length === 0) return [];
-  
-  return teams.value.filter((team: Team) => {
-    const matchesSearch =
-      !searchQuery.value ||
-      team.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      (team.lead && team.lead.toLowerCase().includes(searchQuery.value.toLowerCase()));
-    return matchesSearch;
-  });
+  setup() {
+    const { t, isRTL } = useLanguage();
+    const queryClient = useQueryClient();
+
+    const searchQuery = ref('');
+
+    const { data: teams, isLoading } = useQuery({
+      queryKey: ['teams'],
+      queryFn: async () => {
+        const result = await base44.entities.Team.list();
+        return Array.isArray(result) ? result : (result?.data || result?.value || []);
+      },
+      enabled: true,
+      staleTime: 0,
+      gcTime: 0,
+    });
+
+    const deleteMutation = useMutation({
+      mutationFn: (id: string) => base44.entities.Team.delete(id),
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ['teams'] });
+      },
+    });
+
+    const filteredTeams = computed((): Team[] => {
+      if (!teams.value || !Array.isArray(teams.value) || teams.value.length === 0) {
+        return [];
+      }
+      
+      return teams.value.filter((team: Team) => {
+        const matchesSearch =
+          !searchQuery.value ||
+          team.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+          (team.lead && team.lead.toLowerCase().includes(searchQuery.value.toLowerCase()));
+        return matchesSearch;
+      });
+    });
+
+    return {
+      // State
+      searchQuery,
+      // Data
+      teams,
+      isLoading,
+      // Mutations
+      deleteMutation,
+      // Computed
+      filteredTeams,
+      // Utilities
+      t,
+      isRTL,
+    };
+  },
+
+  mounted() {
+    console.log('🎯 Teams page mounted - ready to display data');
+  },
 });
 </script>
 
@@ -88,7 +136,7 @@ const filteredTeams = computed(() => {
         <div
           v-for="team in filteredTeams"
           :key="team.id"
-          class="opacity-0 animate-[fadeIn_0.3s_ease-in_forwards]"
+          class="fade-in-card"
         >
           <Card class="hover:shadow-lg transition-shadow">
             <CardHeader class="pb-3">
@@ -151,5 +199,9 @@ const filteredTeams = computed(() => {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+.fade-in-card {
+  animation: fadeIn 0.3s ease-in forwards;
 }
 </style>
