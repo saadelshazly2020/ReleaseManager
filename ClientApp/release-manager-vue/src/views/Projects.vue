@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, unref, watch } from 'vue';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query';
 import { base44, type Project, type Team } from '@/api/base44Client';
 import { useLanguage } from '@/composables/useLanguage';
@@ -34,19 +34,48 @@ const formData = ref({
   teamId: '',
 });
 
-const { data: projects = [], isLoading } = useQuery({
+const { data: projects, isLoading, error: projectsError, isSuccess, isFetching } = useQuery({
   queryKey: ['projects'],
-  queryFn: () => base44.entities.Project.list('-createdDate'),
+  queryFn: async () => {
+    console.log('📦 Fetching projects...');
+    try {
+      const result = await base44.entities.Project.list('-createdDate');
+      console.log('📦 Projects raw result:', result);
+      console.log('📦 Result type:', typeof result);
+      console.log('📦 Is array?', Array.isArray(result));
+      console.log('📦 Result keys:', Object.keys(result || {}));
+      
+      // Handle if result is wrapped
+      const data = Array.isArray(result) ? result : (result?.data || result?.value || []);
+      console.log('📦 Final data:', data);
+      console.log('📦 Final data type:', typeof data);
+      console.log('📦 Final is array?', Array.isArray(data));
+      console.log('📦 Final length:', data?.length);
+      
+      return data;
+    } catch (err) {
+      console.error('📦 Error fetching projects:', err);
+      throw err;
+    }
+  },
 });
 
-const { data: teams = [] } = useQuery({
+const { data: teams } = useQuery({
   queryKey: ['teams'],
-  queryFn: () => base44.entities.Team.list(),
+  queryFn: async () => {
+    console.log('👥 Fetching teams...');
+    const result = await base44.entities.Team.list();
+    return Array.isArray(result) ? result : (result?.data || result?.value || []);
+  },
 });
 
-const { data: releases = [] } = useQuery({
+const { data: releases } = useQuery({
   queryKey: ['releases'],
-  queryFn: () => base44.entities.Release.list(),
+  queryFn: async () => {
+    console.log('🚀 Fetching releases...');
+    const result = await base44.entities.Release.list();
+    return Array.isArray(result) ? result : (result?.data || result?.value || []);
+  },
 });
 
 const createMutation = useMutation({
@@ -105,16 +134,34 @@ const handleSave = () => {
 };
 
 const getTeamName = (teamId?: string) => {
-  const team = teams.value.find((t: Team) => t.id === teamId);
+  const teamsArray = unref(teams);
+  if (!teamId || !teamsArray || !Array.isArray(teamsArray) || teamsArray.length === 0) return null;
+  const team = teamsArray.find((t: Team) => t.id === teamId);
   return team?.name;
 };
 
 const getProjectReleases = (projectId: string) => {
-  return releases.value.filter((r: any) => r.projectId === projectId);
+  const releasesArray = unref(releases);
+  if (!releasesArray || !Array.isArray(releasesArray) || releasesArray.length === 0) return [];
+  return releasesArray.filter((r: any) => r.projectId === projectId);
 };
 
 const filteredProjects = computed(() => {
-  return projects.value.filter((project: Project) => {
+  const projectsArray = unref(projects);
+  
+  console.log('🔍 Computing filteredProjects:', {
+    projectsArray,
+    projectsLength: projectsArray?.length,
+    isArray: Array.isArray(projectsArray),
+    type: typeof projectsArray,
+  });
+  
+  if (!projectsArray || !Array.isArray(projectsArray) || projectsArray.length === 0) {
+    console.log('⚠️ No projects to filter');
+    return [];
+  }
+  
+  const filtered = projectsArray.filter((project: Project) => {
     const matchesSearch =
       !searchQuery.value ||
       project.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
@@ -122,7 +169,15 @@ const filteredProjects = computed(() => {
     const matchesStatus = statusFilter.value === 'all' || project.status === statusFilter.value;
     return matchesSearch && matchesStatus;
   });
+  
+  console.log('✅ Filtered projects:', filtered.length);
+  return filtered;
 });
+
+// Watch for projects data changes
+watch(() => projects.value, (newVal) => {
+  console.log('🔄 Projects data changed:', newVal);
+}, { immediate: true, deep: true });
 </script>
 
 <template>
@@ -141,6 +196,16 @@ const filteredProjects = computed(() => {
           <Plus class="w-4 h-4" />
           {{ t('newProject') }}
         </Button>
+      </div>
+
+      <!-- Debug Info (Remove in production) -->
+      <div class="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-xs space-y-1">
+        <p><strong>Debug Info:</strong></p>
+        <p>isLoading: {{ isLoading }} | isFetching: {{ isFetching }} | isSuccess: {{ isSuccess }}</p>
+        <p>Projects.value: {{ projects }}</p>
+        <p>Projects type: {{ typeof projects }} | Is Array: {{ Array.isArray(projects) }} | Length: {{ projects?.length || 'undefined' }}</p>
+        <p>Filtered count: {{ filteredProjects.length }}</p>
+        <p>Error: {{ projectsError?.message || 'None' }}</p>
       </div>
 
       <!-- Filters -->

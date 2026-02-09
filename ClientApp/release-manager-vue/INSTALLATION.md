@@ -83,7 +83,15 @@ The following packages are required:
 
 ## Pages Created
 
-1. ? `Projects.vue` - Projects listing and management page
+1. ? **Dashboard.vue** - Overview with stats, status distribution, upcoming releases, and team workload
+2. ? **Releases.vue** - Complete release management with filtering and CRUD operations
+3. ? **Projects.vue** - Project listing and management with team assignments
+4. ? **Teams.vue** - Team management with member counts and custom colors
+5. ? **ReleaseItems.vue** - Track features, bugs, improvements, and other release items
+
+## Components Created
+
+1. ? **Layout.vue** - Main layout with responsive navigation and language switcher
 
 ## Features Implemented
 

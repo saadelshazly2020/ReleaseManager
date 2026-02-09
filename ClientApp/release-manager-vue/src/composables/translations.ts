@@ -6,6 +6,7 @@ export const translations = {
     releaseItems: 'Release Items',
     projects: 'Projects',
     teams: 'Teams',
+    releaseManager: 'Release Manager',
 
     // Dashboard
     releaseDashboard: 'Release Dashboard',
@@ -18,6 +19,21 @@ export const translations = {
     planning: 'Planning',
     testing: 'Testing',
     cancelled: 'Cancelled',
+    releaseStatusDistribution: 'Release Status Distribution',
+    upcomingReleases: 'Upcoming Releases',
+    teamWorkload: 'Team Workload',
+    activeReleases: 'Active Releases',
+    noReleaseData: 'No release data available',
+    noUpcomingReleases: 'No upcoming releases scheduled',
+    noTeamData: 'No team data available',
+    overdue: 'Overdue',
+
+    // Releases
+    manageReleases: 'Manage all your software releases',
+    searchReleases: 'Search releases...',
+    createRelease: 'Create Release',
+    unassigned: 'Unassigned',
+    notSet: 'Not set',
 
     // Projects
     manageProjects: 'Manage your software projects',
@@ -36,6 +52,29 @@ export const translations = {
     archived: 'Archived',
     completed: 'Completed',
 
+    // Teams
+    manageTeams: 'Manage your development teams',
+    searchTeams: 'Search teams...',
+    newTeam: 'New Team',
+    noTeamsFound: 'No teams found',
+    createFirstTeam: 'Create your first team to get started',
+    createTeam: 'Create Team',
+    members: 'members',
+
+    // Release Items
+    featuresAndBugFixes: 'Features, bug fixes, and changes for releases',
+    searchItems: 'Search items...',
+    addItem: 'Add Item',
+    noItemsFound: 'No items found',
+    addFirstItem: 'Add your first release item to get started',
+    feature: 'Feature',
+    bugFix: 'Bug Fix',
+    improvement: 'Improvement',
+    breakingChange: 'Breaking Change',
+    security: 'Security',
+    documentation: 'Documentation',
+    pending: 'Pending',
+
     // Common
     description: 'Description',
     status: 'Status',
@@ -46,6 +85,11 @@ export const translations = {
     selectStatus: 'Select status',
     selectTeam: 'Select team',
     allStatus: 'All Status',
+    allTypes: 'All Types',
+    low: 'Low',
+    medium: 'Medium',
+    high: 'High',
+    critical: 'Critical',
   },
   ar: {
     // Navigation
@@ -54,6 +98,7 @@ export const translations = {
     releaseItems: 'عناصر الإصدار',
     projects: 'المشاريع',
     teams: 'الفرق',
+    releaseManager: 'مدير الإصدارات',
 
     // Dashboard
     releaseDashboard: 'لوحة تحكم الإصدارات',
@@ -66,6 +111,21 @@ export const translations = {
     planning: 'تخطيط',
     testing: 'اختبار',
     cancelled: 'ملغي',
+    releaseStatusDistribution: 'توزيع حالة الإصدارات',
+    upcomingReleases: 'الإصدارات القادمة',
+    teamWorkload: 'عبء عمل الفريق',
+    activeReleases: 'الإصدارات النشطة',
+    noReleaseData: 'لا توجد بيانات إصدار متاحة',
+    noUpcomingReleases: 'لا توجد إصدارات قادمة مجدولة',
+    noTeamData: 'لا توجد بيانات فريق متاحة',
+    overdue: 'متأخر',
+
+    // Releases
+    manageReleases: 'إدارة جميع إصدارات البرامج',
+    searchReleases: 'البحث في الإصدارات...',
+    createRelease: 'إنشاء إصدار',
+    unassigned: 'غير مخصص',
+    notSet: 'غير محدد',
 
     // Projects
     manageProjects: 'إدارة مشاريع البرامج',
@@ -84,6 +144,29 @@ export const translations = {
     archived: 'مؤرشف',
     completed: 'مكتمل',
 
+    // Teams
+    manageTeams: 'إدارة فرق التطوير',
+    searchTeams: 'البحث في الفرق...',
+    newTeam: 'فريق جديد',
+    noTeamsFound: 'لم يتم العثور على فرق',
+    createFirstTeam: 'أنشئ أول فريق للبدء',
+    createTeam: 'إنشاء فريق',
+    members: 'أعضاء',
+
+    // Release Items
+    featuresAndBugFixes: 'الميزات وإصلاحات الأخطاء والتغييرات للإصدارات',
+    searchItems: 'البحث في العناصر...',
+    addItem: 'إضافة عنصر',
+    noItemsFound: 'لم يتم العثور على عناصر',
+    addFirstItem: 'أضف أول عنصر إصدار للبدء',
+    feature: 'ميزة',
+    bugFix: 'إصلاح خطأ',
+    improvement: 'تحسين',
+    breakingChange: 'تغيير جذري',
+    security: 'أمان',
+    documentation: 'توثيق',
+    pending: 'معلق',
+
     // Common
     description: 'الوصف',
     status: 'الحالة',
@@ -94,6 +177,11 @@ export const translations = {
     selectStatus: 'اختر الحالة',
     selectTeam: 'اختر الفريق',
     allStatus: 'جميع الحالات',
+    allTypes: 'جميع الأنواع',
+    low: 'منخفض',
+    medium: 'متوسط',
+    high: 'عالي',
+    critical: 'حرج',
   },
 };
 
