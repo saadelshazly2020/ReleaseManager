@@ -16,3 +16,5 @@ public class Project
     public Team? Team { get; set; }
     public ICollection<Release> Releases { get; set; } = new List<Release>();
 }
+
+// Removed ProjectDto from this file to move it to an isolated file.
