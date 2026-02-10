@@ -13,6 +13,11 @@ import CardContent from '@/components/ui/CardContent.vue';
 import Badge from '@/components/ui/Badge.vue';
 import { Search, Plus, Package, Edit, Trash2, Loader2, Calendar } from 'lucide-vue-next';
 import { format } from 'date-fns';
+import Dialog from '@/components/ui/Dialog.vue';
+import DialogContent from '@/components/ui/DialogContent.vue';
+import DialogHeader from '@/components/ui/DialogHeader.vue';
+import DialogTitle from '@/components/ui/DialogTitle.vue';
+import DialogFooter from '@/components/ui/DialogFooter.vue';
 
 export default defineComponent({
   name: 'ReleasesView',
@@ -31,6 +36,11 @@ export default defineComponent({
     Trash2,
     Loader2,
     Calendar,
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogFooter,
   },
 
   setup() {
@@ -40,6 +50,18 @@ export default defineComponent({
 
     const searchQuery = ref('');
     const statusFilter = ref<string>('all');
+    const showDialog = ref(false);
+    const editingRelease = ref<Release | null>(null);
+    const formData = ref({
+      name: '',
+      version: '',
+      description: '',
+      status: 'planning',
+      priority: 'medium',
+      scheduledDate: '',
+      projectId: '',
+      teamId: '',
+    });
 
     const STATUS_CONFIG = computed(() => ({
       planning: { label: t('planning'), color: 'bg-slate-100 text-slate-700' },
@@ -90,6 +112,23 @@ export default defineComponent({
       gcTime: 0,
     });
 
+    const createMutation = useMutation({
+      mutationFn: (data: Partial<Release>) => base44.entities.Release.create(data),
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ['releases'] });
+        handleCloseDialog();
+      },
+    });
+
+    const updateMutation = useMutation({
+      mutationFn: ({ id, data }: { id: string; data: Partial<Release> }) =>
+        base44.entities.Release.update(id, data),
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ['releases'] });
+        handleCloseDialog();
+      },
+    });
+
     const deleteMutation = useMutation({
       mutationFn: (id: string) => base44.entities.Release.delete(id),
       onSuccess: () => {
@@ -118,6 +157,61 @@ export default defineComponent({
       return format(new Date(dateString), 'MMM dd, yyyy');
     };
 
+    const handleOpenDialog = (release?: Release): void => {
+      if (release) {
+        editingRelease.value = release;
+        formData.value = {
+          name: release.name || '',
+          version: release.version || '',
+          description: release.description || '',
+          status: release.status || 'planning',
+          priority: release.priority || 'medium',
+          scheduledDate: release.scheduledDate || '',
+          projectId: release.projectId || '',
+          teamId: release.teamId || '',
+        };
+      } else {
+        editingRelease.value = null;
+        formData.value = {
+          name: '',
+          version: '',
+          description: '',
+          status: 'planning',
+          priority: 'medium',
+          scheduledDate: '',
+          projectId: '',
+          teamId: '',
+        };
+      }
+      showDialog.value = true;
+    };
+
+    const handleCloseDialog = (): void => {
+      showDialog.value = false;
+      editingRelease.value = null;
+      formData.value = {
+        name: '',
+        version: '',
+        description: '',
+        status: 'planning',
+        priority: 'medium',
+        scheduledDate: '',
+        projectId: '',
+        teamId: '',
+      };
+    };
+
+    const handleSave = (): void => {
+      if (editingRelease.value) {
+        updateMutation.mutate({
+          id: editingRelease.value.id,
+          data: formData.value,
+        });
+      } else {
+        createMutation.mutate(formData.value);
+      }
+    };
+
     const filteredReleases = computed((): Release[] => {
       if (!releases.value || !Array.isArray(releases.value) || releases.value.length === 0) {
         return [];
@@ -137,12 +231,17 @@ export default defineComponent({
       // State
       searchQuery,
       statusFilter,
+      showDialog,
+      editingRelease,
+      formData,
       // Data
       releases,
       projects,
       teams,
       isLoading,
       // Mutations
+      createMutation,
+      updateMutation,
       deleteMutation,
       // Computed
       filteredReleases,
@@ -152,6 +251,9 @@ export default defineComponent({
       getProjectName,
       getTeamName,
       formatDate,
+      handleOpenDialog,
+      handleCloseDialog,
+      handleSave,
       // Utilities
       t,
       isRTL,
@@ -176,7 +278,7 @@ export default defineComponent({
           <h1 class="text-3xl font-bold text-slate-800">{{ t('releases') }}</h1>
           <p class="text-slate-500 mt-1">Manage all your software releases</p>
         </div>
-        <Button class="bg-indigo-600 hover:bg-indigo-700 gap-2">
+        <Button @click="handleOpenDialog()" class="bg-indigo-600 hover:bg-indigo-700 gap-2">
           <Plus class="w-4 h-4" />
           {{ t('newRelease') }}
         </Button>
@@ -237,7 +339,7 @@ export default defineComponent({
                   </div>
                 </div>
                 <div class="flex gap-1">
-                  <Button variant="ghost" size="icon">
+                  <Button variant="ghost" size="icon" @click="handleOpenDialog(release)">
                     <Edit class="w-4 h-4 text-slate-400" />
                   </Button>
                   <Button variant="ghost" size="icon" @click="deleteMutation.mutate(release.id)">
@@ -277,6 +379,75 @@ export default defineComponent({
         </div>
       </div>
     </div>
+
+    <!-- Create/Edit Release Dialog -->
+    <Dialog :open="showDialog" @update:open="showDialog = $event">
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>
+            {{ editingRelease ? 'Edit Release' : 'New Release' }}
+          </DialogTitle>
+        </DialogHeader>
+        <div class="space-y-4 py-4">
+          <div class="space-y-2">
+            <label class="text-sm font-medium">Release Name</label>
+            <Input v-model="formData.name" type="text" placeholder="Release Name" />
+          </div>
+          <div class="space-y-2">
+            <label class="text-sm font-medium">Version</label>
+            <Input v-model="formData.version" type="text" placeholder="e.g., 1.0.0" />
+          </div>
+          <div class="space-y-2">
+            <label class="text-sm font-medium">Description</label>
+            <Input v-model="formData.description" type="text" placeholder="Description" />
+          </div>
+          <div class="space-y-2">
+            <label class="text-sm font-medium">Scheduled Date</label>
+            <Input v-model="formData.scheduledDate" type="date" />
+          </div>
+          <div class="space-y-2">
+            <label class="text-sm font-medium">Status</label>
+            <select v-model="formData.status" class="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm">
+              <option v-for="(config, key) in STATUS_CONFIG" :key="key" :value="key">
+                {{ config.label }}
+              </option>
+            </select>
+          </div>
+          <div class="space-y-2">
+            <label class="text-sm font-medium">Priority</label>
+            <select v-model="formData.priority" class="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm">
+              <option v-for="(config, key) in PRIORITY_CONFIG" :key="key" :value="key">
+                {{ config.label }}
+              </option>
+            </select>
+          </div>
+          <div class="space-y-2">
+            <label class="text-sm font-medium">Project</label>
+            <select v-model="formData.projectId" class="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm">
+              <option value="">Unassigned</option>
+              <option v-for="project in projects" :key="project.id" :value="project.id">
+                {{ project.name }}
+              </option>
+            </select>
+          </div>
+          <div class="space-y-2">
+            <label class="text-sm font-medium">Team</label>
+            <select v-model="formData.teamId" class="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm">
+              <option value="">Unassigned</option>
+              <option v-for="team in teams" :key="team.id" :value="team.id">
+                {{ team.name }}
+              </option>
+            </select>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" @click="handleCloseDialog">Cancel</Button>
+          <Button @click="handleSave" class="bg-indigo-600 hover:bg-indigo-700">
+            {{ editingRelease ? 'Update' : 'Create' }}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </div>
 </template>
 

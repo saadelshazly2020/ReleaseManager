@@ -10,6 +10,11 @@ import CardHeader from '@/components/ui/CardHeader.vue';
 import CardTitle from '@/components/ui/CardTitle.vue';
 import CardContent from '@/components/ui/CardContent.vue';
 import { Search, Plus, Users, Edit, Trash2, Loader2, User } from 'lucide-vue-next';
+import Dialog from '@/components/ui/Dialog.vue';
+import DialogContent from '@/components/ui/DialogContent.vue';
+import DialogHeader from '@/components/ui/DialogHeader.vue';
+import DialogTitle from '@/components/ui/DialogTitle.vue';
+import DialogFooter from '@/components/ui/DialogFooter.vue';
 
 export default defineComponent({
   name: 'TeamsView',
@@ -27,6 +32,11 @@ export default defineComponent({
     Trash2,
     Loader2,
     User,
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogFooter,
   },
 
   setup() {
@@ -34,6 +44,15 @@ export default defineComponent({
     const queryClient = useQueryClient();
 
     const searchQuery = ref('');
+    const showDialog = ref(false);
+    const editingTeam = ref<Team | null>(null);
+    const formData = ref({
+      name: '',
+      description: '',
+      lead: '',
+      membersCount: 0,
+      color: '#6366f1',
+    });
 
     const { data: teams, isLoading } = useQuery({
       queryKey: ['teams'],
@@ -44,6 +63,23 @@ export default defineComponent({
       enabled: true,
       staleTime: 0,
       gcTime: 0,
+    });
+
+    const createMutation = useMutation({
+      mutationFn: (data: Partial<Team>) => base44.entities.Team.create(data),
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ['teams'] });
+        handleCloseDialog();
+      },
+    });
+
+    const updateMutation = useMutation({
+      mutationFn: ({ id, data }: { id: string; data: Partial<Team> }) =>
+        base44.entities.Team.update(id, data),
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ['teams'] });
+        handleCloseDialog();
+      },
     });
 
     const deleteMutation = useMutation({
@@ -67,16 +103,71 @@ export default defineComponent({
       });
     });
 
+    const handleOpenDialog = (team?: Team): void => {
+      if (team) {
+        editingTeam.value = team;
+        formData.value = {
+          name: team.name || '',
+          description: team.description || '',
+          lead: team.lead || '',
+          membersCount: team.membersCount || 0,
+          color: team.color || '#6366f1',
+        };
+      } else {
+        editingTeam.value = null;
+        formData.value = {
+          name: '',
+          description: '',
+          lead: '',
+          membersCount: 0,
+          color: '#6366f1',
+        };
+      }
+      showDialog.value = true;
+    };
+
+    const handleCloseDialog = (): void => {
+      showDialog.value = false;
+      editingTeam.value = null;
+      formData.value = {
+        name: '',
+        description: '',
+        lead: '',
+        membersCount: 0,
+        color: '#6366f1',
+      };
+    };
+
+    const handleSave = (): void => {
+      if (editingTeam.value) {
+        updateMutation.mutate({
+          id: editingTeam.value.id,
+          data: formData.value,
+        });
+      } else {
+        createMutation.mutate(formData.value);
+      }
+    };
+
     return {
       // State
       searchQuery,
+      showDialog,
+      editingTeam,
+      formData,
       // Data
       teams,
       isLoading,
       // Mutations
+      createMutation,
+      updateMutation,
       deleteMutation,
       // Computed
       filteredTeams,
+      // Methods
+      handleOpenDialog,
+      handleCloseDialog,
+      handleSave,
       // Utilities
       t,
       isRTL,
@@ -101,7 +192,7 @@ export default defineComponent({
           <h1 class="text-3xl font-bold text-slate-800">{{ t('teams') }}</h1>
           <p class="text-slate-500 mt-1">{{ t('manageTeams') }}</p>
         </div>
-        <Button class="bg-indigo-600 hover:bg-indigo-700 gap-2">
+        <Button @click="handleOpenDialog()" class="bg-indigo-600 hover:bg-indigo-700 gap-2">
           <Plus class="w-4 h-4" />
           {{ t('newTeam') }}
         </Button>
@@ -157,7 +248,7 @@ export default defineComponent({
                   </div>
                 </div>
                 <div class="flex gap-1">
-                  <Button variant="ghost" size="icon">
+                  <Button variant="ghost" size="icon" @click="handleOpenDialog(team)">
                     <Edit class="w-4 h-4 text-slate-400" />
                   </Button>
                   <Button variant="ghost" size="icon" @click="deleteMutation.mutate(team.id)">
@@ -186,6 +277,45 @@ export default defineComponent({
         </div>
       </div>
     </div>
+
+    <!-- Create/Edit Team Dialog -->
+    <Dialog :open="showDialog" @update:open="showDialog = $event">
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>
+            {{ editingTeam ? 'Edit Team' : 'New Team' }}
+          </DialogTitle>
+        </DialogHeader>
+        <div class="space-y-4 py-4">
+          <div class="space-y-2">
+            <label class="text-sm font-medium">Team Name</label>
+            <Input v-model="formData.name" type="text" placeholder="Team Name" />
+          </div>
+          <div class="space-y-2">
+            <label class="text-sm font-medium">Description</label>
+            <Input v-model="formData.description" type="text" placeholder="Description" />
+          </div>
+          <div class="space-y-2">
+            <label class="text-sm font-medium">Team Lead</label>
+            <Input v-model="formData.lead" type="text" placeholder="Lead Name" />
+          </div>
+          <div class="space-y-2">
+            <label class="text-sm font-medium">Members Count</label>
+            <Input v-model.number="formData.membersCount" type="number" placeholder="0" />
+          </div>
+          <div class="space-y-2">
+            <label class="text-sm font-medium">Color</label>
+            <Input v-model="formData.color" type="color" />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" @click="handleCloseDialog">Cancel</Button>
+          <Button @click="handleSave" class="bg-indigo-600 hover:bg-indigo-700">
+            {{ editingTeam ? 'Update' : 'Create' }}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </div>
 </template>
 

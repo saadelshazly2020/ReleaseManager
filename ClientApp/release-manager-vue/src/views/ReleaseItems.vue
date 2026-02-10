@@ -11,6 +11,11 @@ import CardTitle from '@/components/ui/CardTitle.vue';
 import CardContent from '@/components/ui/CardContent.vue';
 import Badge from '@/components/ui/Badge.vue';
 import { Search, Plus, ListTodo, Edit, Trash2, Loader2, User, Hash } from 'lucide-vue-next';
+import Dialog from '@/components/ui/Dialog.vue';
+import DialogContent from '@/components/ui/DialogContent.vue';
+import DialogHeader from '@/components/ui/DialogHeader.vue';
+import DialogTitle from '@/components/ui/DialogTitle.vue';
+import DialogFooter from '@/components/ui/DialogFooter.vue';
 
 export default defineComponent({
   name: 'ReleaseItemsView',
@@ -30,6 +35,11 @@ export default defineComponent({
     Loader2,
     User,
     Hash,
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogFooter,
   },
 
   setup() {
@@ -38,6 +48,17 @@ export default defineComponent({
 
     const searchQuery = ref('');
     const typeFilter = ref<string>('all');
+    const showDialog = ref(false);
+    const editingItem = ref<ReleaseItem | null>(null);
+    const formData = ref({
+      title: '',
+      description: '',
+      type: 'feature',
+      status: 'pending',
+      ticketNumber: '',
+      assignedTo: '',
+      releaseId: '',
+    });
 
     const TYPE_CONFIG = computed(() => ({
       feature: { label: t('feature'), color: 'bg-blue-100 text-blue-700', icon: '✨' },
@@ -76,6 +97,23 @@ export default defineComponent({
       gcTime: 0,
     });
 
+    const createMutation = useMutation({
+      mutationFn: (data: Partial<ReleaseItem>) => base44.entities.ReleaseItem.create(data),
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ['releaseitems'] });
+        handleCloseDialog();
+      },
+    });
+
+    const updateMutation = useMutation({
+      mutationFn: ({ id, data }: { id: string; data: Partial<ReleaseItem> }) =>
+        base44.entities.ReleaseItem.update(id, data),
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ['releaseitems'] });
+        handleCloseDialog();
+      },
+    });
+
     const deleteMutation = useMutation({
       mutationFn: (id: string) => base44.entities.ReleaseItem.delete(id),
       onSuccess: () => {
@@ -106,14 +144,71 @@ export default defineComponent({
       });
     });
 
+    const handleOpenDialog = (item?: ReleaseItem): void => {
+      if (item) {
+        editingItem.value = item;
+        formData.value = {
+          title: item.title || '',
+          description: item.description || '',
+          type: item.type || 'feature',
+          status: item.status || 'pending',
+          ticketNumber: item.ticketNumber || '',
+          assignedTo: item.assignedTo || '',
+          releaseId: item.releaseId || '',
+        };
+      } else {
+        editingItem.value = null;
+        formData.value = {
+          title: '',
+          description: '',
+          type: 'feature',
+          status: 'pending',
+          ticketNumber: '',
+          assignedTo: '',
+          releaseId: '',
+        };
+      }
+      showDialog.value = true;
+    };
+
+    const handleCloseDialog = (): void => {
+      showDialog.value = false;
+      editingItem.value = null;
+      formData.value = {
+        title: '',
+        description: '',
+        type: 'feature',
+        status: 'pending',
+        ticketNumber: '',
+        assignedTo: '',
+        releaseId: '',
+      };
+    };
+
+    const handleSave = (): void => {
+      if (editingItem.value) {
+        updateMutation.mutate({
+          id: editingItem.value.id,
+          data: formData.value,
+        });
+      } else {
+        createMutation.mutate(formData.value);
+      }
+    };
+
     return {
       // State
       searchQuery,
       typeFilter,
+      showDialog,
+      editingItem,
+      formData,
       // Data
       items,
       isLoading,
       // Mutations
+      createMutation,
+      updateMutation,
       deleteMutation,
       // Computed
       filteredItems,
@@ -121,6 +216,9 @@ export default defineComponent({
       STATUS_CONFIG,
       // Methods
       getReleaseName,
+      handleOpenDialog,
+      handleCloseDialog,
+      handleSave,
       // Utilities
       t,
       isRTL,
@@ -145,7 +243,7 @@ export default defineComponent({
           <h1 class="text-3xl font-bold text-slate-800">{{ t('releaseItems') }}</h1>
           <p class="text-slate-500 mt-1">{{ t('featuresAndBugFixes') }}</p>
         </div>
-        <Button class="bg-indigo-600 hover:bg-indigo-700 gap-2">
+        <Button @click="handleOpenDialog()" class="bg-indigo-600 hover:bg-indigo-700 gap-2">
           <Plus class="w-4 h-4" />
           {{ t('addItem') }}
         </Button>
@@ -225,7 +323,7 @@ export default defineComponent({
                   </div>
                 </div>
                 <div class="flex gap-1">
-                  <Button variant="ghost" size="icon">
+                  <Button variant="ghost" size="icon" @click="handleOpenDialog(item)">
                     <Edit class="w-4 h-4 text-slate-400" />
                   </Button>
                   <Button variant="ghost" size="icon" @click="deleteMutation.mutate(item.id)">
@@ -238,6 +336,57 @@ export default defineComponent({
         </div>
       </div>
     </div>
+
+    <!-- Create/Edit Release Item Dialog -->
+    <Dialog :open="showDialog" @update:open="showDialog = $event">
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>
+            {{ editingItem ? 'Edit Item' : 'New Item' }}
+          </DialogTitle>
+        </DialogHeader>
+        <div class="space-y-4 py-4">
+          <div class="space-y-2">
+            <label class="text-sm font-medium">Title</label>
+            <Input v-model="formData.title" type="text" placeholder="Item Title" />
+          </div>
+          <div class="space-y-2">
+            <label class="text-sm font-medium">Description</label>
+            <Input v-model="formData.description" type="text" placeholder="Description" />
+          </div>
+          <div class="space-y-2">
+            <label class="text-sm font-medium">Ticket Number</label>
+            <Input v-model="formData.ticketNumber" type="text" placeholder="e.g., JIRA-123" />
+          </div>
+          <div class="space-y-2">
+            <label class="text-sm font-medium">Assigned To</label>
+            <Input v-model="formData.assignedTo" type="text" placeholder="Developer Name" />
+          </div>
+          <div class="space-y-2">
+            <label class="text-sm font-medium">Type</label>
+            <select v-model="formData.type" class="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm">
+              <option v-for="(config, key) in TYPE_CONFIG" :key="key" :value="key">
+                {{ config.icon }} {{ config.label }}
+              </option>
+            </select>
+          </div>
+          <div class="space-y-2">
+            <label class="text-sm font-medium">Status</label>
+            <select v-model="formData.status" class="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm">
+              <option v-for="(config, key) in STATUS_CONFIG" :key="key" :value="key">
+                {{ config.label }}
+              </option>
+            </select>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" @click="handleCloseDialog">Cancel</Button>
+          <Button @click="handleSave" class="bg-indigo-600 hover:bg-indigo-700">
+            {{ editingItem ? 'Update' : 'Create' }}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </div>
 </template>
 
